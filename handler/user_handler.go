@@ -29,19 +29,6 @@ func GetUserByID(c *gin.Context) {
 	c.JSON(http.StatusOK, user)
 }
 
-// POST /users
-func CreateUser(c *gin.Context) {
-	var user model.User
-
-	if err := c.ShouldBindJSON(&user); err != nil {
-		c.JSON(http.StatusBadRequest, ValidationError(err))
-		return
-	}
-
-	config.DB.Create(&user)
-	c.JSON(http.StatusCreated, user)
-}
-
 // PUT /users/:id
 func UpdateUser(c *gin.Context) {
 	var user model.User
