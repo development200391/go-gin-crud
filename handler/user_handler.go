@@ -17,7 +17,45 @@ type updateUserRequest struct {
 	Name     string `json:"name" binding:"required,min=3"`
 	Email    string `json:"email" binding:"required,email"`
 	Password string `json:"password,omitempty" binding:"omitempty,min=6"`
-	Role     string `json:"role"`
+	RoleID   *uint  `json:"role_id"`
+}
+
+type createUserRequest struct {
+	Name     string `json:"name" binding:"required,min=3"`
+	Email    string `json:"email" binding:"required,email"`
+	Password string `json:"password" binding:"required,min=6"`
+	RoleID   *uint  `json:"role_id"`
+}
+
+// POST /users
+func CreateUser(c *gin.Context) {
+	var req createUserRequest
+
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, ValidationError(err))
+		return
+	}
+
+	hashed, err := bcrypt.GenerateFromPassword([]byte(req.Password), 10)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to hash password"})
+		return
+	}
+
+	user := model.User{
+		Name:     req.Name,
+		Email:    req.Email,
+		Password: string(hashed),
+		IsActive: true,
+		RoleID:   req.RoleID,
+	}
+
+	if err := config.DB.Create(&user).Error; err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusCreated, user)
 }
 
 // GET /users
@@ -57,8 +95,9 @@ func UpdateUser(c *gin.Context) {
 	updates := map[string]interface{}{
 		"name":  req.Name,
 		"email": req.Email,
-		"role":  req.Role,
 	}
+
+	updates["role_id"] = req.RoleID
 
 	if req.Password != "" {
 		hashed, err := bcrypt.GenerateFromPassword([]byte(req.Password), 10)

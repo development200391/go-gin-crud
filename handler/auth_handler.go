@@ -16,7 +16,7 @@ type registerRequest struct {
 	Name     string `json:"name" binding:"required,min=3"`
 	Email    string `json:"email" binding:"required,email"`
 	Password string `json:"password" binding:"required,min=6"`
-	Role     string `json:"role"`
+	RoleID   *uint  `json:"role_id"`
 }
 
 // POST /register
@@ -34,17 +34,12 @@ func Register(c *gin.Context) {
 		return
 	}
 
-	role := req.Role
-	if role == "" {
-		role = "user"
-	}
-
 	user := model.User{
 		Name:     req.Name,
 		Email:    req.Email,
 		Password: string(hashed),
 		IsActive: true,
-		Role:     role,
+		RoleID:   req.RoleID,
 	}
 
 	if err := config.DB.Create(&user).Error; err != nil {
@@ -57,7 +52,7 @@ func Register(c *gin.Context) {
 		"name":       user.Name,
 		"email":      user.Email,
 		"is_active":  user.IsActive,
-		"role":       user.Role,
+		"role_id":    user.RoleID,
 		"created_at": user.CreatedAt,
 		"updated_at": user.UpdatedAt,
 	})
