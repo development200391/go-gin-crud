@@ -12,27 +12,54 @@ import (
 	"go-gin-crud/utils"
 )
 
+type registerRequest struct {
+	Name     string `json:"name" binding:"required,min=3"`
+	Email    string `json:"email" binding:"required,email"`
+	Password string `json:"password" binding:"required,min=6"`
+	Role     string `json:"role"`
+}
+
 // POST /register
 func Register(c *gin.Context) {
-	var user model.User
+	var req registerRequest
 
-	if err := c.ShouldBindJSON(&user); err != nil {
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, ValidationError(err))
+		return
+	}
+
+	hashed, err := bcrypt.GenerateFromPassword([]byte(req.Password), 10)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to hash password"})
+		return
+	}
+
+	role := req.Role
+	if role == "" {
+		role = "user"
+	}
+
+	user := model.User{
+		Name:     req.Name,
+		Email:    req.Email,
+		Password: string(hashed),
+		IsActive: true,
+		Role:     role,
+	}
+
+	if err := config.DB.Create(&user).Error; err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
-	hashed, _ := bcrypt.GenerateFromPassword([]byte(user.Password), 10)
-	user.Password = string(hashed)
-
-	if err := config.DB.Create(&user).Error; err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Email already exists"})
-		return
-	}
-
 	c.JSON(http.StatusCreated, gin.H{
-		"id":    user.ID,
-		"name":  user.Name,
-		"email": user.Email,
+		"id":         user.ID,
+		"name":       user.Name,
+		"email":      user.Email,
+		"is_active":  user.IsActive,
+		"role":       user.Role,
+		"created_at": user.CreatedAt,
+		"updated_at": user.UpdatedAt,
 	})
 }
 
@@ -46,7 +73,7 @@ func Login(c *gin.Context) {
 		return
 	}
 
-	if err := config.DB.Where("email = ?", req.Email).First(&user).Error; err != nil {
+	if err := config.DB.Where("email = ? AND is_active = ?", req.Email, true).First(&user).Error; err != nil {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid credentials"})
 		return
 	}
